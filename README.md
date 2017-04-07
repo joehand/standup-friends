@@ -5,8 +5,8 @@ Echo standup messages to a dedicated channel and record them to a [hypercore](ht
 [![npm][npm-image]][npm-url]
 [![standard][standard-image]][standard-url]
 
-**Problem:** We have a #standup channel but we'd often get in discussion around standup items people posted and lose everyone's standup message.
-**Solution:** Keep all human messages in a single channel but have a bot echo standup messages to a dedicated channel and a hypercore feed.
+* **Problem:** We have a #standup channel but we'd often get in discussion around standup items people posted and lose everyone's standup message.
+* **Solution:** Keep all human messages in a single channel but have a bot echo standup messages to a dedicated channel and a hypercore feed.
 
 For example, we have to channels `#general` and `#standup`:
 

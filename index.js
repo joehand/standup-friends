@@ -50,10 +50,18 @@ if (argv.channel) {
     console.log('Connected to IRC, listening for messages')
   })
 
+  client.on('error', function (err) {
+    console.error(err)
+  })
+
   client.on('message', function (from, to, message) {
     var op = parse(message, from)
-    if (!op) return
     var channel = (to === argv.name) ? from : argv.channel
+    if (!op) {
+      if (message.indexOf('standup') === -1) return
+      var err = new Error('Could not parse standup message.')
+      return sendMessage(err, channel)
+    }
     switch (op.command) {
       case 'standup':
         delete op.command // don't need this in our hypercore feed
@@ -71,6 +79,7 @@ if (argv.channel) {
           sendMessage(err, channel, msg)
         })
       default:
+        console.error(op, 'bad command')
         // sendMessage(new Error('Did not understand your command. Sad beep boop.'), channel)
         return
     }
@@ -92,19 +101,13 @@ function status (cb) {
 function parse (message, from) {
   message = message.trim()
 
-  if (message[0] === '!') {
-    message = message.slice(1)
-  } else {
-    // TODO: what is this case?
-    var name = (message.indexOf(':') > -1 ? message.split(':')[0] : '').trim().replace(/\d+$/, '')
-    if (name !== argv.name) return null
-  }
+  if (message[0] !== '!') return // Only want ! command
 
-  message = message.split(':').pop().trim()
+  message = message.slice(1)
   if (message.indexOf(' ') === -1) return {command: message, standup: null}
   var parts = message.split(' ')
   return {
-    time: new Date(), // TODO: local date
+    time: new Date().toUTCString(),
     command: parts.shift(),
     standup: parts.join(' '),
     person: from

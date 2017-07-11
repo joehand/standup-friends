@@ -41,7 +41,6 @@ function joinIrc () {
   var channels = []
   if (argv.channel) channels.push(argv.channel)
   if (argv.echoChannel) channels.push(argv.echoChannel)
-  console.log(channels)
   var ircOpts = extend({}, argv, {
     channels: channels,
     retryCount: 1000,

@@ -9,6 +9,7 @@ var prettyTime = require('pretty-time')
 
 var argv = minimist(process.argv.slice(2), {
   alias: {
+    tail: 'key',
     channel: 'c',
     echoChannel: 'echo',
     cwd: 'd',
@@ -29,15 +30,20 @@ var argv = minimist(process.argv.slice(2), {
 var started = process.hrtime()
 var client = null
 var server = null
-var feed = hypercore(argv.cwd, {valueEncoding: 'json'})
+var feed = hypercore(argv.cwd, argv.key, {valueEncoding: 'json'})
 feed.ready(function () {
   discovery(feed, {live: true})
   console.log(`Sharing feed ${feed.key.toString('hex')}`)
+  if (argv.channel || argv.echoChannel) joinIrc()
 })
 
-if (argv.channel) {
+function joinIrc () {
+  var channels = []
+  if (argv.channel) channels.push(argv.channel)
+  if (argv.echoChannel) channels.push(argv.echoChannel)
+  console.log(channels)
   var ircOpts = extend({}, argv, {
-    channels: [argv.channel, argv.echoChannel],
+    channels: channels,
     retryCount: 1000,
     autoRejoin: true
   })
@@ -51,39 +57,41 @@ if (argv.channel) {
   })
 
   client.on('error', function (err) {
-    console.error(err)
+    console.error('IRC Error', err)
   })
 
-  client.on('message', function (from, to, message) {
-    var op = parse(message, from)
-    var channel = (to === argv.name) ? from : argv.channel
-    if (!op) {
-      if (message.indexOf('standup') === -1) return
-      var err = new Error('Could not parse standup message.')
-      return sendMessage(err, channel)
-    }
-    switch (op.command) {
-      case 'standup':
-        delete op.command // don't need this in our hypercore feed
-        feed.append(op, function (err) {
-          if (err) return sendMessage(err, channel)
-          if (argv.echoChannel) {
-            var msg = `${op.person}: ${op.standup}`
-            // Echo to our standup channel
-            return sendMessage(null, argv.echoChannel, msg)
-          }
-        })
-        return
-      case 'status':
-        return status(function (err, msg) {
-          sendMessage(err, channel, msg)
-        })
-      default:
-        console.error(op, 'bad command')
-        // sendMessage(new Error('Did not understand your command. Sad beep boop.'), channel)
-        return
-    }
-  })
+  if (argv.echoChannel) {
+    if (!argv.tail) echoFeed()
+    feed.on('sync', echoFeed) // do not echo old data
+  }
+
+  if (argv.channel) {
+    client.on('message', function (from, to, message) {
+      var op = parse(message, from)
+      var channel = (to === argv.name) ? from : argv.channel
+      if (!op) {
+        if (message.indexOf('!standup') === -1) return
+        var err = new Error('Could not parse standup message.')
+        return sendMessage(err, channel)
+      }
+      switch (op.command) {
+        case 'standup':
+          delete op.command // don't need this in our hypercore feed
+          feed.append(op, function (err) {
+            if (err) return sendMessage(err, channel)
+          })
+          return
+        case 'status':
+          return status(function (err, msg) {
+            sendMessage(err, channel, msg)
+          })
+        default:
+          console.error(op, 'bad command')
+          // sendMessage(new Error('Did not understand your command. Sad beep boop.'), channel)
+          return
+      }
+    })
+  }
 }
 
 function sendMessage (err, channel, msg) {
@@ -96,6 +104,14 @@ function status (cb) {
   if (feed.length) msg += ` Standups: ${feed.length},`
   msg += ` Key: ${feed.key.toString('hex')}`
   cb(null, msg)
+}
+
+function echoFeed () {
+  feed.createReadStream({live: true, start: feed.length})
+    .on('data', function (data) {
+       // Echo to our standup channel
+      sendMessage(null, argv.echoChannel, `${data.person}: ${data.standup}`)
+    })
 }
 
 function parse (message, from) {

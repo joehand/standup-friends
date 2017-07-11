@@ -45,6 +45,16 @@ npm install -g hyperpipe
 hyperpipe standup-data <key>
 ```
 
+### Tailing
+
+You can tail an existing standup key and echo it to another channel/server. This is useful if you want to echo on multiple irc servers.
+
+```
+standup-friends --cwd=data-tail --echo=#dat --tail=<key-from-above>
+```
+
+This will store a duplicate of the data in `/data-tail`.
+
 ### IRC Commands
 
 ```
